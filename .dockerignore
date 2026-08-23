@@ -1,0 +1,13 @@
+# Everything the image builds for itself or must never contain
+target/
+frontend/
+.git/
+.idea/
+.env
+.env.*
+*.log
+**/.DS_Store
+docs/
+*.md
+render.yaml
+docker-compose.yml

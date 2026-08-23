@@ -1,0 +1,10 @@
+# Applied on Render via SPRING_PROFILES_ACTIVE=prod.
+spring:
+  jpa:
+    show-sql: false
+
+logging:
+  level:
+    root: WARN
+    com.schema.versioncontrol: INFO
+    org.hibernate.SQL: WARN

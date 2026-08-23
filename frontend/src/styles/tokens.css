@@ -1,0 +1,108 @@
+/* ===========================================================================
+   Design tokens — "Refined Slate"
+   A calm, dense, IDE-grade dark palette. Surfaces step in even luminance
+   increments so elevation reads without relying on blur or heavy shadows.
+   =========================================================================== */
+
+:root {
+  color-scheme: dark;
+
+  /* --- Surfaces (low → high elevation) --- */
+  --canvas:      #070b14;
+  --surface-1:   #0c1220;
+  --surface-2:   #111a2b;
+  --surface-3:   #17223a;
+  --surface-4:   #1e2b47;
+  --overlay:     rgba(4, 7, 13, 0.72);
+
+  /* --- Lines --- */
+  --line:        #1b2437;
+  --line-2:      #26324b;
+  --line-3:      #35456616;
+
+  /* --- Text --- */
+  --text-1:      #e7ecf7;
+  --text-2:      #97a5bd;
+  --text-3:      #616f8a;
+  --text-on-accent: #f7f9ff;
+
+  /* --- Accent: indigo (primary action, active state) --- */
+  --indigo:      #6d7cff;
+  --indigo-hi:   #8b97ff;
+  --indigo-lo:   #4d5bd9;
+  --indigo-tint: rgba(109, 124, 255, 0.13);
+  --indigo-edge: rgba(109, 124, 255, 0.34);
+
+  /* --- Accent: cyan (source branch, secondary emphasis) --- */
+  --cyan:        #3ec9e8;
+  --cyan-tint:   rgba(62, 201, 232, 0.12);
+  --cyan-edge:   rgba(62, 201, 232, 0.30);
+
+  /* --- Semantic / diff --- */
+  --add:         #35d39b;
+  --add-tint:    rgba(53, 211, 155, 0.11);
+  --add-edge:    rgba(53, 211, 155, 0.30);
+
+  --del:         #fb7185;
+  --del-tint:    rgba(251, 113, 133, 0.11);
+  --del-edge:    rgba(251, 113, 133, 0.30);
+
+  --mod:         #f5b544;
+  --mod-tint:    rgba(245, 181, 68, 0.11);
+  --mod-edge:    rgba(245, 181, 68, 0.30);
+
+  --info:        var(--indigo);
+  --info-tint:   var(--indigo-tint);
+  --info-edge:   var(--indigo-edge);
+
+  /* --- Typography --- */
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --fs-xs:   0.6875rem;  /* 11px — meta, timestamps */
+  --fs-sm:   0.75rem;    /* 12px — dense UI chrome */
+  --fs-base: 0.8125rem;  /* 13px — default body */
+  --fs-md:   0.875rem;   /* 14px — emphasis */
+  --fs-lg:   1rem;       /* 16px — section titles */
+  --fs-xl:   1.1875rem;  /* 19px — page titles */
+  --fs-2xl:  1.5rem;     /* 24px — hero */
+
+  --lh-tight: 1.25;
+  --lh-base:  1.55;
+
+  /* --- Spacing (4px base) --- */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-10: 40px;
+  --s-12: 48px;
+
+  /* --- Radii --- */
+  --r-xs:   4px;
+  --r-sm:   6px;
+  --r-md:   8px;
+  --r-lg:   12px;
+  --r-xl:   16px;
+  --r-full: 9999px;
+
+  /* --- Elevation --- */
+  --sh-1: 0 1px 2px rgba(0, 0, 0, 0.32);
+  --sh-2: 0 4px 12px -2px rgba(0, 0, 0, 0.42);
+  --sh-3: 0 16px 40px -12px rgba(0, 0, 0, 0.62);
+  --ring: 0 0 0 3px var(--indigo-tint);
+
+  /* --- Motion --- */
+  --t-fast: 110ms cubic-bezier(0.4, 0, 0.2, 1);
+  --t-base: 170ms cubic-bezier(0.4, 0, 0.2, 1);
+  --t-slow: 280ms cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* --- Layout --- */
+  --topbar-h:  52px;
+  --sidebar-w: 264px;
+  --sidebar-collapsed-w: 52px;
+  --tablelist-w: 248px;
+}

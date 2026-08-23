@@ -1,0 +1,53 @@
+# Local development stack. Mirrors the Render topology: the same image, the same
+# environment variable names, a real Postgres instead of an in-memory database.
+#
+#   docker compose up --build        api + db
+#   docker compose up -d db          just the database, run the app from your IDE
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: schemavc-db
+    environment:
+      POSTGRES_DB: ${DB_NAME:-schemavc}
+      POSTGRES_USER: ${DB_USER:-schemavc}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-schemavc}
+    ports:
+      # Published on 55432 so it cannot collide with a Postgres already
+      # running on the host's 5432. Inside the compose network it is still 5432.
+      - "${DB_PUBLISHED_PORT:-55432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-schemavc} -d ${DB_NAME:-schemavc}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: schemavc-api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-schemavc}
+      DB_USER: ${DB_USER:-schemavc}
+      DB_PASSWORD: ${DB_PASSWORD:-schemavc}
+      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      JPA_SHOW_SQL: "false"
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+volumes:
+  pgdata:
