@@ -33,6 +33,8 @@ EXPOSE 8080
 
 # Respect the container's memory limit rather than the host's. SerialGC keeps
 # the footprint down on Render's 512MB free instances.
-ENV JAVA_OPTS="-XX:MaxRAMPercentage=75 -XX:+UseSerialGC"
+# TieredStopAtLevel=1 skips C2 compilation for faster startup at the cost of
+# peak throughput (acceptable for a low-traffic API on a free tier).
+ENV JAVA_OPTS="-XX:MaxRAMPercentage=75 -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -Dspring.jmx.enabled=false"
 
 ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar app.jar"]

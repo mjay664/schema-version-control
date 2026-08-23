@@ -1,5 +1,9 @@
 # Applied on Render via SPRING_PROFILES_ACTIVE=prod.
 spring:
+  main:
+    # Defer bean creation until first use – cuts cold-start time on
+    # Render's memory-constrained free instances.
+    lazy-initialization: true
   jpa:
     show-sql: false
 
