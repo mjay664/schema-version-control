@@ -11,6 +11,8 @@ server:
 spring:
   application:
     name: schema-version-control
+  main:
+    lazy-initialization: true
 
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:55432}/${DB_NAME:schemavc}
