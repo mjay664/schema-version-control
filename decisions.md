@@ -364,6 +364,10 @@ Repository selection deliberately does not do this. Picking another repository k
 
 ## 12. PostgreSQL, Docker & Render Deployment
 
+> Partly superseded by decision 13. The Postgres, Flyway, no-seed, environment-driven
+> configuration and hardening decisions below all still stand; the hosting target moved
+> from Render to AWS.
+
 ### Decision
 
 1. **PostgreSQL replaces H2 as the application database.** H2 was in-memory (`jdbc:h2:mem`), so every restart discarded all repositories, branches and users. The Postgres driver was already declared; it was simply never used. H2 is now scoped to `test` and stays out of the production image.
@@ -399,3 +403,52 @@ Repository selection deliberately does not do this. Picking another repository k
 ### Free tier caveats
 
 Render's free Postgres is deleted roughly 30 days after creation, and free web services sleep after 15 minutes idle with a ~50s JVM cold start. Because the frontend is a static site it stays up, so the symptom is a page that loads and then cannot reach its API.
+
+---
+
+## 13. Moving the Deployment from Render to AWS
+
+### Context
+
+Decision 12 deployed to Render and recorded the free tier's two costs: a Postgres instance deleted roughly 30 days after creation, and a web service that sleeps after 15 minutes idle and then takes ~50s to answer while the JVM starts. In practice the second one dominated. Because the frontend is a static site it stays up, so an idle deployment presents as a page that loads normally and then hangs on its first API call — from the outside, indistinguishable from a broken application.
+
+A deployment whose purpose is to be opened and tried by someone else, at a time nobody controls, cannot have a 50-second first request. That is what forced the move; nothing about Render's behaviour was unexpected or misconfigured.
+
+### Decision
+
+1. **The backend runs on a single always-on EC2 instance.** Docker Compose runs the API and Postgres on that instance, using the same image and the same environment variable names as local development — the topology `docker-compose.yml` was already written to mirror. Because the instance never idles out, there is no cold start to absorb: the first request after an hour of quiet costs the same as the second.
+
+2. **Postgres moves onto the instance rather than to RDS.** The database is a compose service on an EBS-backed volume. This keeps the deployed stack identical to the local one and avoids a managed-database bill, at the cost of losing managed backups — see the trade-off in point 6.
+
+3. **The frontend is a static build in S3, served through CloudFront.** This preserves the split established in decision 12: the SPA is a CDN artifact, the API is a service, and they deploy independently. S3 alone would serve the build over HTTP only, so CloudFront is what makes it an HTTPS origin.
+
+4. **A second CloudFront distribution fronts the API.** This is the part that is not optional. Once the frontend is served over HTTPS, a browser blocks its requests to an HTTP backend as active mixed content — the page loads and every API call fails, which is a worse failure than the cold start it replaced. Putting CloudFront in front of the EC2 instance terminates TLS with an AWS-issued certificate, so the API is reachable over HTTPS without registering a domain or provisioning a certificate on the instance itself.
+
+5. **Configuration that Render wired automatically is now set by hand.** The blueprint's conveniences all disappear with it, and each one becomes an explicit step:
+   - `JWT_SECRET` was `generateValue: true` in `render.yaml`. It must now be generated and set on the instance. `DeploymentSanityCheck` is what makes this safe to get wrong: under the `prod` profile it refuses to start while the committed development default is still in place, so a forgotten secret fails the deploy instead of shipping a publicly-known signing key.
+   - Database credentials were wired with `fromDatabase`. They are now compose environment variables on the instance.
+   - `CORS_ALLOWED_ORIGINS` must be the frontend's CloudFront domain. Left at its permissive default the app works, which is exactly why it is easy to leave wrong; the sanity check warns but does not fail on this.
+   - `VITE_API_BASE_URL` was wired with `fromService`. It is now set at build time to the API distribution's URL — and because Vite inlines it, changing the API domain requires rebuilding the frontend and re-uploading to S3. A redeploy of the backend alone cannot fix a stale API URL.
+
+6. **What this gives up.** Render's managed Postgres took backups; a compose volume on one EC2 instance does not. Backup is now an operational task that is not yet automated, and the instance is a single point of failure for both the API and its data. This is an accepted trade for a project whose deployment exists to be demonstrated, and it is the first thing that would have to change if the data mattered.
+
+### Alternatives considered
+
+- **Staying on Render and paying for an instance that does not sleep** — the smallest possible change: it removes the cold start outright, keeps the blueprint, keeps managed Postgres and backups, and needs no infrastructure work at all. This is the better engineering answer for a product, and it is worth being straightforward that it was not rejected on technical grounds. AWS was chosen for the control it gives over the deployment and for the value of having built the topology directly rather than declaring it.
+- **App Runner, Elastic Beanstalk or ECS Fargate** — closer to Render's model, with the container lifecycle and TLS managed. Rejected as substituting one platform's abstractions for another's while still leaving the cold-start question to the platform's scaling policy.
+- **RDS for Postgres** — managed backups, point-in-time recovery, and no database competing with the JVM for the instance's memory. Rejected on cost for this project, and it is the change to make first if the deployment ever needs to survive losing the instance.
+- **An Application Load Balancer with an ACM certificate instead of CloudFront for the API** — the conventional way to terminate TLS in front of EC2, and a better fit for an API than a CDN. Rejected because an ALB bills by the hour whether or not anything is calling it, while CloudFront is a per-request cost, and because the frontend already needed a distribution — one mechanism covers both.
+- **Serving the built frontend from Spring Boot on the same instance** — decision 12 rejected this to give the SPA a CDN that stays up while a free backend sleeps. That reasoning no longer applies once the backend does not sleep, and the option is genuinely stronger here: one origin, no CORS, no build-time API URL, no S3, no second distribution, and mixed content impossible by construction. Kept as the fallback if the two-distribution setup proves fussy to maintain; not taken because it couples frontend deploys to backend restarts and gives up the CDN.
+- **Serving the frontend over plain HTTP to match the backend** — makes mixed content moot by removing HTTPS instead of adding it. Rejected: it sends JWTs over the wire in the clear.
+
+### Notes
+
+- **The API distribution must forward `Authorization` and must not cache.** A CloudFront distribution in front of an API defaults to CDN behaviour: strip request headers and serve responses from cache. Left alone, that breaks authentication — either every request arrives unauthenticated, or one user's response is served to another from the edge. The API distribution needs caching disabled and `Authorization` forwarded before anything past login works.
+- **CloudFront must rewrite 403/404 to `/index.html`** for the frontend distribution. S3 has no notion of client-side routes, so without it the app works when entered at the root and 404s on any deep link or refresh.
+- `/actuator/health` was made public in decision 12 so Render could poll it. It stays public and is still the right health check for the instance; nothing else under `/actuator` is exposed.
+- The scheme-less-hostname fallback in `resolveApiOrigin` (`frontend/src/lib/api.js`) exists because Render's `fromService` yielded a bare hostname. A CloudFront domain is configured with an explicit `https://`, so that branch is now vestigial — harmless, and left in place rather than removed for a deployment that may still be used.
+- **Cost is now continuous rather than zero.** An always-on instance bills whether or not anyone is using it, which is precisely what buys the absence of cold starts. An AWS budget alert is configured so the bill cannot grow unnoticed.
+
+### Status of the Render configuration
+
+`render.yaml` is retained and still correct — the blueprint deploys and runs. It is no longer the live deployment, and the README's deployment section and `frontend/.env.example` still describe Render, which is documentation drift to settle rather than a defect in either setup.
